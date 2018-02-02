@@ -18,8 +18,6 @@ class CreateBidsTable extends Migration
 
             $table->string('code')->index()->unique();
 
-            $table->integer('beneficiary_id')->index()->nullable();
-            $table->foreign('beneficiary_id')->references('id')->on('beneficiaries');
             $table->integer('set_id')->index();
             $table->foreign('set_id')->references('id')->on('bid_sets');
 

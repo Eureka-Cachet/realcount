@@ -17,9 +17,10 @@ class CreateAttendancesTable extends Migration
         Schema::create('attendances', function (Blueprint $table) {
             $table->increments('id');
 
+            $table->uuid('uuid')->index();
             $table->timestamp('date');
             $table->timestamp('time');
-            $table->enum('io', $this->getClockTypes())->default(Constants::CLOCK_OUT);
+            $table->enum('io', $this->getClockTypes())->default(Constants::CLOCK_IN);
 
             $table->integer('beneficiary_id')->index();
             $table->foreign('beneficiary_id')->references('id')->on('beneficiaries')->onDelete('cascade');

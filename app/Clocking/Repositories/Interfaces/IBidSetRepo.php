@@ -10,7 +10,7 @@ interface IBidSetRepo
 {
     /**
      * @param array $inputs
-     * @return array
+     * @return BidSet
      */
     public function create(array $inputs);
 

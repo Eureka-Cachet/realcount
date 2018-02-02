@@ -6,10 +6,10 @@ use Illuminate\Database\Eloquent\Model;
 
 class Bid extends Model
 {
-    protected $fillable = ['code', 'beneficiary_id', 'set_id'];
+    protected $fillable = ['code', 'set_id'];
 
     public function beneficiary()
     {
-        return $this->belongsTo(Beneficiary::class);
+        return $this->hasOne(Beneficiary::class);
     }
 }

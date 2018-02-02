@@ -78,7 +78,7 @@ class FingerprintRepo implements IFingerprintRepo
      */
     private function deleteFiles(Beneficiary $beneficiary)
     {
-        $fingerprints = $beneficiary->fingerprints;
+        $fingerprints = $beneficiary->fingerprints()->get()->toArray();
         return $this->doDeleteFiles($fingerprints);
     }
 
@@ -106,7 +106,7 @@ class FingerprintRepo implements IFingerprintRepo
             );
         }
 
-        return $data;
+        return $inputs;
     }
 
     /**
@@ -137,7 +137,7 @@ class FingerprintRepo implements IFingerprintRepo
      * @return string
      */
     private function makeFilename($beneficiary, $fingerType){
-        return $beneficiary->full_name . "_" . $beneficiary->bid . "_" . $fingerType;
+        return $beneficiary->full_name . "_" . $beneficiary->bid->code . "_" . $fingerType;
     }
 
     /**
@@ -158,8 +158,8 @@ class FingerprintRepo implements IFingerprintRepo
     {
         $deleted = false;
         foreach ($fingerprints as $fingerprint) {
-            $deleted = $this->getStorageDisk()->exists($fingerprint->path)
-                ? $this->getStorageDisk()->delete($fingerprint->path)
+            $deleted = $this->getStorageDisk()->exists($fingerprint['path'])
+                ? $this->getStorageDisk()->delete($fingerprint['path'])
                 : true;
         }
         return $deleted;

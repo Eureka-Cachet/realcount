@@ -18,7 +18,7 @@ class CreateDevicesTable extends Migration
 
             $table->uuid('uuid')->index();
             $table->string('code')->index();
-            $table->string('name');
+            $table->string('name')->index()->unique();
             $table->boolean('status')->default(false);
 
             $table->integer('branch_id')->index()->nullable();

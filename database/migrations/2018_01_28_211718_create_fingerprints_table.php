@@ -17,7 +17,7 @@ class CreateFingerprintsTable extends Migration
         Schema::create('fingerprints', function (Blueprint $table) {
             $table->increments('id');
 
-            $table->enum('type', $this->getFingerTypes());
+            $table->enum('finger', $this->getFingerTypes());
             $table->binary('fmd');
             $table->string('path');
 

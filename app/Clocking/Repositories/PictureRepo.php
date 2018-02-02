@@ -125,6 +125,6 @@ class PictureRepo implements IPictureRepo
      */
     private function getFilename(Beneficiary $beneficiary)
     {
-        return str_slug($beneficiary->full_name)."_".$beneficiary->bid;
+        return str_slug($beneficiary->full_name)."_".$beneficiary->bid->code;
     }
 }

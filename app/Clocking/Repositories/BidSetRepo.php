@@ -41,7 +41,7 @@ class BidSetRepo implements IBidSetRepo
 
     /**
      * @param array $inputs
-     * @return array
+     * @return BidSet
      */
     public function create(array $inputs)
     {
@@ -57,7 +57,7 @@ class BidSetRepo implements IBidSetRepo
             ]);
         }
 
-        return $set->codes()->get()->toArray();
+        return $set;
     }
 
     /**
@@ -78,7 +78,7 @@ class BidSetRepo implements IBidSetRepo
         $set = $this->single($setId);
         if(is_null($set)) return null;
 
-        $codes = $set->codes()->whereNull('user_id')->get();
+        $codes = $set->codes()->whereDoesntHave('beneficiary')->get();
         return $codes->toArray();
     }
 
@@ -133,7 +133,7 @@ class BidSetRepo implements IBidSetRepo
     }
 
     /**
-     * @param Builder $query
+     * @param Builder | BidSet $query
      * @param $sort
      * @return Builder
      */
@@ -152,7 +152,7 @@ class BidSetRepo implements IBidSetRepo
     }
 
     /**
-     * @param Builder $query
+     * @param Builder | BidSet $query
      * @param $filter
      * @return Builder
      */
@@ -224,7 +224,7 @@ class BidSetRepo implements IBidSetRepo
      * @param $area
      * @return Builder
      */
-    private function performAreaFilter(Builder $query, $area): Builder
+    private function performAreaFilter($query, $area): Builder
     {
         list($areaColumn, $areaId) = $area;
         $areaColumn = $this->formatColumn($areaColumn);
@@ -238,7 +238,7 @@ class BidSetRepo implements IBidSetRepo
      * @param $uuid
      * @return Builder
      */
-    private function performGeneratorFilter(Builder $query, $uuid): Builder
+    private function performGeneratorFilter($query, $uuid): Builder
     {
         return $query->whereHas('generator', function (Builder $q) use ($uuid) {
             $q->where('uuid', $uuid);
@@ -250,7 +250,7 @@ class BidSetRepo implements IBidSetRepo
      * @param $rankId
      * @return Builder
      */
-    private function performRankFilter(Builder $query, $rankId): Builder
+    private function performRankFilter($query, $rankId): Builder
     {
         return $query->where('rank_id', $rankId);
     }
@@ -260,7 +260,7 @@ class BidSetRepo implements IBidSetRepo
      * @param $moduleId
      * @return Builder
      */
-    private function performModuleFilter(Builder $query, $moduleId): Builder
+    private function performModuleFilter($query, $moduleId): Builder
     {
         return $query->where('module_id', $moduleId);
     }
@@ -270,7 +270,7 @@ class BidSetRepo implements IBidSetRepo
      * @param $sort
      * @return Builder
      */
-    private function performCodesCountSort(Builder $query, $sort): Builder
+    private function performCodesCountSort($query, $sort): Builder
     {
         $used = null;
         list($column, $direction) = $sort;
@@ -288,11 +288,11 @@ class BidSetRepo implements IBidSetRepo
     }
 
     /**
-     * @param Builder $query
+     * @param Builder | BidSet $query
      * @param $search
      * @return Builder
      */
-    private function performSearch(Builder $query, $search)
+    private function performSearch($query, $search)
     {
         return $query->where('name', 'like', "%{$search}%");
     }

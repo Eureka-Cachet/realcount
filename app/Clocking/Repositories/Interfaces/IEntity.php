@@ -14,15 +14,15 @@ interface IEntity
     /**
      * @return string
      */
-    public static function getName(): string;
+    public function getName(): string;
 
     /**
      * @return array
      */
-    public static function getActions(): array;
+    public function getActions(): array;
 
     /**
      * @return string
      */
-    public static function getGateName(): string;
+    public function getGateName(): string;
 }

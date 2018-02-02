@@ -22,7 +22,7 @@ interface IUserRepo
      * @param array $inputs
      * @return User
      */
-    public function create(array $inputs): User;
+    public function create(array $inputs);
 
     /**
      * @param string $uuid

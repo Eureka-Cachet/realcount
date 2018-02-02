@@ -1,7 +1,12 @@
 <?php
 
+use App\Http\Controllers\ActionApiController;
+use App\Http\Controllers\EntityApiController;
+use App\Http\Controllers\GateApiController;
 use Clocking\Helpers\Traits\TDBSeeder;
+use Clocking\Repositories\Interfaces\IEntity;
 use Illuminate\Database\Seeder;
+use Ramsey\Uuid\Uuid;
 
 class GateTableSeeder extends Seeder
 {
@@ -24,8 +29,31 @@ class GateTableSeeder extends Seeder
      */
     private function data()
     {
-        return [
+        return collect($this->controllers())
+            ->map(function($controller){
+                return resolve($controller);
+            })
+            ->map(function(IEntity $controller){
+                return $controller->getGateName();
+            })->unique()
+            ->map(function($gate){
+                return [
+                    'uuid' => Uuid::uuid4()->toString(),
+                    'name' => $gate
+                ];
+            })
+            ->toArray();
+    }
 
+    /**
+     * @return array
+     */
+    private function controllers()
+    {
+        return [
+            ActionApiController::class,
+            EntityApiController::class,
+            GateApiController::class
         ];
     }
 }

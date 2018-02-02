@@ -11,4 +11,7 @@ class Constants
 
     const CLOCK_IN = "in";
     const CLOCK_OUT = "out";
+
+    const MALE = 1;
+    const FEMALE = 0;
 }

@@ -148,8 +148,8 @@ class DeviceRepo implements IDeviceRepo
      */
     private function sameBranch(Device $device, Branch $branch): bool
     {
-        $deviceBranch = $device->branch;
-        if(!$deviceBranch->exists() || !$branch->devices()->exists()) return false;
+        $deviceBranch = $device->branch()->exists();
+        if(!$deviceBranch || !$branch->devices()->exists()) return false;
         return $branch->devices()->where('id', $device->id)->exists();
     }
 
@@ -157,13 +157,13 @@ class DeviceRepo implements IDeviceRepo
      * @param Device $device
      * @return bool
      */
-    private function hasBranch(Device $device): bool
+    private function hasBranch($device): bool
     {
         return $device->branch()->exists();
     }
 
     /**
-     * @param Builder $query
+     * @param Builder | Device $query
      * @param $sort
      * @return Builder
      */
@@ -181,7 +181,7 @@ class DeviceRepo implements IDeviceRepo
     }
 
     /**
-     * @param Builder $query
+     * @param Builder | Device $query
      * @param $filter
      * @return Builder
      */
@@ -191,7 +191,7 @@ class DeviceRepo implements IDeviceRepo
         // a|d:id -> district
         // a|l:id -> location
         // a|b:id -> branch
-        // s|id -> status
+        // s|v -> status
 
         $filters = collect(explode(",", $filter))
             ->map(function($el){
@@ -212,7 +212,7 @@ class DeviceRepo implements IDeviceRepo
             : $query;
 
         $status = $filters->get('status');
-        $query = $status
+        $query = !is_null($status)
             ? $query->where('status', $status)
             : $query;
 
@@ -234,25 +234,25 @@ class DeviceRepo implements IDeviceRepo
     }
 
     /**
-     * @param Builder $query
+     * @param Builder | Device $query
      * @param $area
      * @return Builder
      */
-    private function performAreaFilter(Builder $query, $area): Builder
+    private function performAreaFilter($query, $area): Builder
     {
         list($areaColumn, $areaId) = $area;
         $areaColumn = $this->formatColumn($areaColumn);
-        return $query->whereHas($areaColumn, function(Builder $q) use($areaId){
-            $q->where('id', $areaId);
+        return $query->whereHas($areaColumn, function(Builder $query) use($areaId){
+            $query->where('id', $areaId);
         });
     }
 
     /**
-     * @param Builder $query
+     * @param Builder | Device $query
      * @param $search
      * @return Builder
      */
-    private function performSearch(Builder $query, $search)
+    private function performSearch($query, $search)
     {
         return $query->where('name', 'like', "%{$search}%");
     }

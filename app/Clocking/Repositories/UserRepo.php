@@ -53,13 +53,10 @@ class UserRepo implements IUserRepo
             : $query;
 
         // search query
-        if ($opts->has('q')) {
-            $searchQuery = $opts->get('q');
-            $query->where(function($q) use($searchQuery) {
-                $value = "%{$searchQuery}%";
-                $q->where('full_name', 'like', $value);
-            });
-        }
+        $search = $opts->get('q');
+        $query = $search
+            ? $this->performSearch($query, $search)
+            : $query;
 
         // per page
         $perPage = $opts->get('pp') ?: 10;
@@ -114,11 +111,11 @@ class UserRepo implements IUserRepo
     }
 
     /**
-     * @param Builder $query
+     * @param Builder | User $query
      * @param $sort
      * @return Builder
      */
-    private function performSort(Builder $query, $sort)
+    private function performSort($query, $sort)
     {
         // n|[asc|desc] -> full_name
         // d|[asc|desc] -> created_at
@@ -137,7 +134,7 @@ class UserRepo implements IUserRepo
     }
 
     /**
-     * @param Builder $query
+     * @param Builder | User $query
      * @param $filter
      * @return Builder
      */
@@ -176,8 +173,8 @@ class UserRepo implements IUserRepo
             : $query;
 
         $status = $filters->get('status');
-        $query = $status
-            ? $query->where('status', $status)
+        $query = !is_null($status)
+            ? $this->performStatusFilter($query, $status)
             : $query;
 
         return $query;
@@ -209,6 +206,32 @@ class UserRepo implements IUserRepo
         $areaColumn = $this->formatColumn($areaColumn);
         return $query->whereHas($areaColumn, function(Builder $q) use($areaId){
             $q->where('id', $areaId);
+        });
+    }
+
+    /**
+     * @param Builder | User $query
+     * @param $search
+     * @return Builder
+     */
+    private function performSearch($query, $search)
+    {
+        return $query->where(function (Builder $query) use ($search) {
+            $value = "%{$search}%";
+            $query->where('full_name', 'like', $value)
+                ->orWhere('username', 'like', $value);
+        });
+    }
+
+    /**
+     * @param $query
+     * @param $status
+     * @return mixed
+     */
+    private function performStatusFilter($query, $status)
+    {
+        return $query->where(function (Builder $query) use ($status) {
+            $query->where('status', $status);
         });
     }
 }

@@ -53,13 +53,13 @@ class BranchRepo implements IBranchRepo
             : $query;
 
         // search query
-        if ($opts->has('q')) {
-            $searchQuery = $opts->get('q');
-            $query->where(function($q) use($searchQuery) {
-                $value = "%{$searchQuery}%";
-                $q->where('name', 'like', $value);
-            });
-        }
+        $search = $opts->get('q');
+        $query = $search
+            ? $query->where(function(Builder $query) use($search){
+                $value = "%{$search}%";
+                $query->where('name', 'like', $value);
+            })
+            : $query;
 
         // per page
         $perPage = $opts->get('pp') ?: 10;
@@ -114,11 +114,11 @@ class BranchRepo implements IBranchRepo
     }
 
     /**
-     * @param Builder $query
+     * @param Builder | Branch $query
      * @param $sort
      * @return Builder
      */
-    private function performSort(Builder $query, $sort)
+    private function performSort($query, $sort)
     {
         // n|[asc|desc] -> name
         // d|[asc|desc] -> created_at
@@ -136,7 +136,7 @@ class BranchRepo implements IBranchRepo
     }
 
     /**
-     * @param Builder $query
+     * @param Builder | Branch $query
      * @param $filter
      * @return Builder
      */
@@ -180,11 +180,11 @@ class BranchRepo implements IBranchRepo
     }
 
     /**
-     * @param Builder $query
+     * @param Builder | Branch $query
      * @param $area
      * @return Builder
      */
-    private function performAreaFilter(Builder $query, $area): Builder
+    private function performAreaFilter($query, $area): Builder
     {
         list($areaColumn, $areaId) = $area;
         $areaColumn = $this->formatColumn($areaColumn);

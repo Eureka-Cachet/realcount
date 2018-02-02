@@ -6,7 +6,7 @@ use Illuminate\Database\Eloquent\Model;
 
 class Attendance extends Model
 {
-    protected $fillable = ['beneficiary_id', 'date', 'time', 'device_id', 'io'];
+    protected $fillable = ['uuid', 'beneficiary_id', 'date', 'time', 'device_id', 'io'];
 
     public function beneficiary(){
         return $this->belongsTo(Beneficiary::class, 'beneficiary_id');

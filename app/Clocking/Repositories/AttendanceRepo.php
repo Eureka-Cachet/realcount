@@ -5,9 +5,11 @@ namespace Clocking\Repositories;
 use App\Attendance;
 use App\Beneficiary;
 use Carbon\Carbon;
+use Clocking\Helpers\Constants;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
+use Ramsey\Uuid\Uuid;
 
 class AttendanceRepo
 {
@@ -80,7 +82,7 @@ class AttendanceRepo
         $attendance = null;
 
         $beneficiary = $this->beneficiaryRepo
-            ->single($inputs['beneficiary_id'], 'bid');
+            ->single($inputs['beneficiary_bid'], 'bid');
 
         if(is_null($beneficiary)) return $attendance;
 
@@ -95,14 +97,14 @@ class AttendanceRepo
         $data = $this->prepareData($beneficiary, $inputs);
 
         if($clocks == 1){
-            $data = array_merge($data, ['clock_in' => false]);
-            $attendance = $this->attendance->create($data);
+            $data = array_merge($data, ['io' => Constants::CLOCK_OUT]);
         }
 
         if($clocks < 1){
-            $data = array_merge($data, ['clock_in' => true]);
-            $attendance = $this->attendance->create($data);
+            $data = array_merge($data, ['io' => Constants::CLOCK_IN]);
         }
+
+        $attendance = $this->attendance->create($data);
 
         return $attendance;
     }
@@ -166,11 +168,11 @@ class AttendanceRepo
     }
 
     /**
-     * @param Builder $query
+     * @param Builder | Attendance $query
      * @param string $sort
      * @return Builder
      */
-    private function performSort(Builder $query, string $sort): Builder
+    private function performSort($query, string $sort): Builder
     {
         //name -> n|asc, n|desc
         list($column, $direction) = explode("|", $sort);
@@ -181,11 +183,11 @@ class AttendanceRepo
     }
 
     /**
-     * @param Builder $query
+     * @param Builder | Attendance $query
      * @param string $filter
      * @return Builder
      */
-    private function performFilter(Builder $query, string $filter): Builder
+    private function performFilter($query, string $filter): Builder
     {
         //region -> a|r:id
         //district -> a|d:id
@@ -245,6 +247,7 @@ class AttendanceRepo
         $timestamp = Carbon::createFromTimestamp($timestampString);
         $date = Carbon::createFromTimestamp($timestampString)->startOfDay();
         return [
+            'uuid' => Uuid::uuid4()->toString(),
             'time' => $timestamp,
             'date' => $date,
             'beneficiary_id' => $beneficiary->id,
@@ -267,23 +270,25 @@ class AttendanceRepo
     }
 
     /**
-     * @param Builder $query
+     * @param Builder | Attendance $query
      * @param $dateRange
      * @return Builder
      */
-    private function performDateRangeFilter(Builder $query, $dateRange): Builder
+    private function performDateRangeFilter($query, $dateRange): Builder
     {
         list($start, $end) = $dateRange;
-        return $query->where('date', '>=', Carbon::createFromTimestamp($start)->startOfDay())
-            ->where('date', '<=', Carbon::createFromTimestamp($end)->endOfDay());
+        $start = Carbon::createFromTimestamp($start)->startOfDay()->timestamp;
+        $end = Carbon::createFromTimestamp($end)->endOfDay()->timestamp;
+        return $query->where('date', '>=', $start)
+            ->where('date', '<=', $end);
     }
 
     /**
-     * @param Builder $query
+     * @param Builder | Attendance $query
      * @param $area
      * @return Builder
      */
-    private function performAreaFilter(Builder $query, $area): Builder
+    private function performAreaFilter($query, $area): Builder
     {
         list($areaColumn, $areaId) = $area;
         $areaColumn = $this->formatColumn($areaColumn);
@@ -313,14 +318,16 @@ class AttendanceRepo
     }
 
     /**
-     * @param Builder $query
+     * @param Builder | Attendance $query
      * @param string $searchQuery
      * @return Builder
      */
-    private function performSearch(Builder $query, string $searchQuery): Builder
+    private function performSearch($query, string $searchQuery): Builder
     {
         return $query->whereHas('beneficiary', function(Builder $q) use ($searchQuery) {
-            $q->where('bid', $searchQuery);
+            $value = "%{$searchQuery}%";
+            $q->where('bid', 'like', $value)
+                ->orWhere('full_name', 'like', $value);
         });
     }
 }

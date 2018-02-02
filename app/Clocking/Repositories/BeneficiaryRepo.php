@@ -62,14 +62,16 @@ class BeneficiaryRepo implements IBeneficiaryRepo
         DB::transaction(function() use($inputs, &$b){
             $data = $this->prepareData($inputs);
 
-            $data = array_merge($data, ['uuid' => Uuid::uuid4()->toString()]);
+            $data = array_merge($data, ['uuid' =>
+                Uuid::uuid4()->toString()]);
+
+            $data = array_merge($data, ['bid_id' =>
+                $this->bid->where('code', $inputs['bid'])->first()->id]);
 
             $beneficiary = $this->beneficiary->create($data);
 
             $bio = collect($inputs)->get('bio');
             if($bio) $this->addBio($beneficiary, $bio);
-
-            $this->updateBid($beneficiary, $inputs['bid']);
 
             $b = $beneficiary;
         });
@@ -95,6 +97,11 @@ class BeneficiaryRepo implements IBeneficiaryRepo
     public function single(string $beneficiaryId, string $column = null)
     {
         $column = $column ? $column : 'uuid';
+        if($column == 'bid')
+            return $this->beneficiary
+                ->whereHas($column, function($q) use($beneficiaryId){
+                    $q->where('code', $beneficiaryId);
+                })->first();
         return $this->beneficiary
             ->where($column, $beneficiaryId)
             ->first();
@@ -121,7 +128,7 @@ class BeneficiaryRepo implements IBeneficiaryRepo
     public function delete(string $beneficiaryId): bool
     {
         $beneficiary = $this->single($beneficiaryId);
-        if(!is_null($beneficiary)) return false;
+        if(is_null($beneficiary)) return false;
 
         return $this->pictureRepo->deleteFor($beneficiary)
             && $this->fingerprintRepo->deleteFor($beneficiary)
@@ -176,28 +183,27 @@ class BeneficiaryRepo implements IBeneficiaryRepo
     private function prepareData(array $inputs)
     {
         $inputs = collect($inputs);
-        $data = collect([]);
+        $data = $inputs->all();
 
         $gender = $inputs->get('gender');
         if(!is_null($gender)){
-            $data->put('gender',
-                $this->getGender($gender));
+            $data = array_add($data, 'gender', $gender);
         }
 
         $surname = $inputs->get('surname');
         $forenames = $inputs->get('forenames');
-        if(!is_null($surname) && !!is_null($forenames)){
-            $data->put('full_name',
+        if(!is_null($surname) && !is_null($forenames)){
+            $data = array_add($data, 'full_name',
                 $this->getFullName($surname, $forenames));
         }
 
         $dateOfBirth = $inputs->get('date_of_birth');
         if(!is_null($dateOfBirth)){
-            $data->put('date_of_birth',
+            $data = array_add($data, 'date_of_birth',
                 $this->getDateOfBirth($dateOfBirth));
         }
 
-        return $data->all();
+        return $data;
     }
 
     /**
@@ -247,10 +253,12 @@ class BeneficiaryRepo implements IBeneficiaryRepo
      */
     private function getFilterKeyColumn($key)
     {
-        if($key == 'c') return 'branch.district.region.country';
-        if($key == 'r') return 'branch.district.region';
-        if($key == 'd') return 'branch.district';
-        if($key == 'b') return 'branch_id';
+        if($key == 'c') return 'branch.location.district.region.country';
+        if($key == 'r') return 'branch.location.district.region';
+        if($key == 'd') return 'branch.location.district';
+        if($key == 'b') return 'branch';
+        if($key == 'm') return 'module';
+        if($key == 'r') return 'rank';
 
         return $key;
     }
@@ -273,91 +281,101 @@ class BeneficiaryRepo implements IBeneficiaryRepo
      */
     private function updateBio(Beneficiary $beneficiary, array $bioInputs)
     {
-        return $this->updateBeneficiaryFingerPrints($beneficiary, $bioInputs)
-            && $this->updateBeneficiaryPicture($beneficiary, $bioInputs);
+        $bioInputs = collect($bioInputs);
+        $updated = false;
+
+        $fingers = $bioInputs->get('fingers');
+        if(!is_null($fingers))
+            $updated = $this->updateBeneficiaryFingerPrints($beneficiary, $fingers);
+
+        $picture = $bioInputs->get('picture');
+        if(!is_null($picture))
+            $updated = $this->updateBeneficiaryPicture($beneficiary, $picture);
+
+        return $updated;
     }
 
     /**
      * @param Beneficiary $beneficiary
-     * @param array $bioInputs
+     * @param array $fingerprintInputs
      * @return bool
      */
-    private function updateBeneficiaryFingerPrints(Beneficiary $beneficiary, array $bioInputs)
+    private function updateBeneficiaryFingerPrints(Beneficiary $beneficiary, array $fingerprintInputs)
     {
-        $data = $this->prepareFingerPrintsData($bioInputs);
+        $data = $this->prepareFingerPrintsData($fingerprintInputs);
         $updated = $this->fingerprintRepo->updateFor($beneficiary, $data);
         return $updated;
     }
 
     /**
      * @param $beneficiary
-     * @param array $bioInputs
+     * @param $picture
      * @return bool
      */
-    private function updateBeneficiaryPicture($beneficiary, array $bioInputs)
+    private function updateBeneficiaryPicture($beneficiary, $picture)
     {
-        $data = $this->preparePictureData($bioInputs);
+        $data = $this->preparePictureData($picture);
         return $this->pictureRepo->updateFor($beneficiary, $data);
     }
 
     /**
      * @param Beneficiary $beneficiary
-     * @param array $bioInputs
+     * @param array $fingerprintInputs
      */
-    private function addFingerPrints(Beneficiary $beneficiary, array $bioInputs)
+    private function addFingerPrints(Beneficiary $beneficiary, array $fingerprintInputs)
     {
-        $fingerPrints = $this->prepareFingerPrintsData($bioInputs);
+        $fingerPrints = $this->prepareFingerPrintsData($fingerprintInputs);
         $this->fingerprintRepo->addFor($beneficiary, $fingerPrints);
     }
 
     /**
-     * @param array $bioInputs
+     * @param array $fingerprintInputs
      * @return array
      */
-    private function prepareFingerPrintsData(array $bioInputs)
+    private function prepareFingerPrintsData(array $fingerprintInputs)
     {
         $data = [];
         array_push($data, [
             "finger" => Constants::THUMB_RIGHT,
-            "encoded" => $bioInputs["thumb_right_image"],
-            "fmd" => $bioInputs["thumb_right_fmd"]
+            "encoded" => $fingerprintInputs["thumb_right_image"],
+            "fmd" => $fingerprintInputs["thumb_right_fmd"]
         ]);
         array_push($data, [
             "finger" => Constants::THUMB_LEFT,
-            "encoded" => $bioInputs["thumb_left_image"],
-            "fmd" => $bioInputs["thumb_left_fmd"]
+            "encoded" => $fingerprintInputs["thumb_left_image"],
+            "fmd" => $fingerprintInputs["thumb_left_fmd"]
         ]);
         array_push($data, [
             "finger" => Constants::INDEX_RIGHT,
-            "encoded" => $bioInputs["index_right_image"],
-            "fmd" => $bioInputs["index_right_fmd"]
+            "encoded" => $fingerprintInputs["index_right_image"],
+            "fmd" => $fingerprintInputs["index_right_fmd"]
         ]);
         array_push($data, [
             "finger" => Constants::INDEX_LEFT,
-            "encoded" => $bioInputs["index_left_image"],
-            "fmd" => $bioInputs["index_left_fmd"]
+            "encoded" => $fingerprintInputs["index_left_image"],
+            "fmd" => $fingerprintInputs["index_left_fmd"]
         ]);
         return $data;
     }
 
     /**
      * @param Beneficiary $beneficiary
-     * @param array $bioInputs
+     * @param $picture
      */
-    private function addPicture(Beneficiary $beneficiary, array $bioInputs)
+    private function addPicture(Beneficiary $beneficiary, $picture)
     {
-        $pictureData = $this->preparePictureData($bioInputs);
+        $pictureData = $this->preparePictureData($picture);
         $this->pictureRepo->addFor($beneficiary, $pictureData);
     }
 
     /**
-     * @param array $bioInputs
+     * @param $picture
      * @return array
      */
-    private function preparePictureData(array $bioInputs)
+    private function preparePictureData($picture)
     {
         return [
-            "encoded" => $bioInputs["picture"]
+            "encoded" => $picture
         ];
     }
 
@@ -371,7 +389,7 @@ class BeneficiaryRepo implements IBeneficiaryRepo
         // fn|order
         // bid|order
         list($sortCol, $sortDir) = explode('|', $sort);
-        $sortCol = $this->getFilterKeyColumn($sortCol);
+        $sortCol = $this->getSortKeyColumn($sortCol);
         return starts_with($sortCol, 'branch.')
             ? $query->whereHas($sortCol, function(Builder $query) use ($sortDir, $sortCol) {
                 $query->orderBy($sortCol, $sortDir);
@@ -386,14 +404,76 @@ class BeneficiaryRepo implements IBeneficiaryRepo
      */
     private function performFilter(Builder $query, string $filter)
     {
-        list($filterKey, $filterValue) = explode('|', $filter);
-        $column = $this->getFilterKeyColumn($filterKey);
-        $query = $query->where($column, $filterValue);
-        return starts_with($column, 'branch.')
-            ? $query->whereHas($column, function(Builder $query) use ($filterValue, $column) {
-                $query->where($column, $filterValue);
-            })
-            : $query->where($column, $filterValue);
+        //r|id -> rank
+        //m|id -> module
+        //a|b:id -> branch
+        //a|r:id -> region
+        //a|d:id -> district
+        //a|l:id -> location
+//        list($filterKey, $filterValue) = explode('|', $filter);
+        $filters = collect(explode(",", $filter))
+            ->map(function($el){
+                list($column, $value) = explode("|", $el);
+                return [
+                    'column' => $column,
+                    'value' => $value
+                ];
+            })->flatMap(function($el){
+                $column = $this->getFilterKeyColumn($el['column']);
+                if($column == 'a') return [ $column => explode(":", $el['value'])];
+                return [$column => $el['value']];
+            });
+
+        $area = $filters->get('a');
+        $query = $area
+            ? $this->performAreaFilter($query, $area)
+            : $query;
+
+        $rank = $filters->get('rank');
+        $query = $rank
+            ? $this->performRankFilter($query, $rank)
+            : $query;
+
+        $module = $filters->get('module');
+        $query = $module
+            ? $this->performModuleFilter($query, $module)
+            : $query;
+
+        return $query;
+    }
+
+    /**
+     * @param Builder $query
+     * @param $area
+     * @return Builder
+     */
+    private function performAreaFilter($query, $area): Builder
+    {
+        list($areaColumn, $areaId) = $area;
+        $areaColumn = $this->getFilterKeyColumn($areaColumn);
+        return $query->whereHas($areaColumn, function(Builder $q) use($areaId){
+            $q->where('id', $areaId);
+        });
+    }
+
+    /**
+     * @param Builder $query
+     * @param $rankId
+     * @return Builder
+     */
+    private function performRankFilter($query, $rankId): Builder
+    {
+        return $query->where('rank_id', $rankId);
+    }
+
+    /**
+     * @param Builder $query
+     * @param $moduleId
+     * @return Builder
+     */
+    private function performModuleFilter($query, $moduleId): Builder
+    {
+        return $query->where('module_id', $moduleId);
     }
 
     /**
@@ -402,21 +482,14 @@ class BeneficiaryRepo implements IBeneficiaryRepo
      */
     private function addBio(Beneficiary $beneficiary, array $bioInputs)
     {
-        if(array_has($bioInputs, 'thumb_right_fmd'))
-            $this->addFingerPrints($beneficiary, $bioInputs);
+        $bioInputs = collect($bioInputs);
 
-        if(array_has($bioInputs, 'picture'))
-            $this->addPicture($beneficiary, $bioInputs);
-    }
+        $fingers = $bioInputs->get('fingers');
+        if(!is_null($fingers))
+            $this->addFingerPrints($beneficiary, $fingers);
 
-    /**
-     * @param string $bid
-     * @param Beneficiary $beneficiary
-     */
-    private function updateBid(Beneficiary $beneficiary, string $bid)
-    {
-        $this->bid->where('code', $bid)
-            ->whereNull('beneficiary_id')
-            ->first()->update(['beneficiary_id' => $beneficiary->id]);
+        $picture = $bioInputs->get('picture');
+        if(!is_null($picture))
+            $this->addPicture($beneficiary, $picture);
     }
 }

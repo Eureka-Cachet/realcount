@@ -25,7 +25,12 @@ class RoleTableSeeder extends Seeder
     private function data()
     {
         return [
-
+            [
+                'uuid' => \Ramsey\Uuid\Uuid::uuid4()->toString(),
+                'name' => 'root',
+                'level_type' => 'country',
+                'level_id' => 1
+            ]
         ];
     }
 }
